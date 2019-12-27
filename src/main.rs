@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 
-const NO_UNIT: &str = "NO_UNIT";
 const UNITS_TXT: &str = include_str!("units.txt");
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -67,12 +66,12 @@ fn parse_sensors(filepath: &str) {
         }
         if sensor.sensor_type == SensorType::Numeric {
             match unit {
-                None => println!("Sensor id={} is numeric but has no unit", id),
                 Some(unit) => {
                     if !units.contains(unit) {
                         println!("Sensor id={} has an invalid unit", id);
                     }
                 }
+                None => (), // It's ok to have no unit, just highly uncommon.
             }
         } else {
             if unit.is_some() {
@@ -179,6 +178,5 @@ fn units() -> HashSet<String> {
             units.extend(line.split(",").map(|s| s.to_owned()));
         }
     }
-    units.insert(NO_UNIT.to_owned());
     units
 }
