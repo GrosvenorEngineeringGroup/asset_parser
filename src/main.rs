@@ -92,6 +92,15 @@ fn parse_assets(assets_filepath: &str, sensors_filepath: &str) {
         }
         check_asset_sensors(mandatory_sensors, &sensors, id);
         check_asset_sensors(optional_sensors, &sensors, id);
+        if has_duplicate_sensor_ids(mandatory_sensors, optional_sensors) {
+            println!("Asset id={} has duplicate sensor ids", id);
+        }
+    }
+
+    let mut unique_asset_ids = HashSet::new();
+    unique_asset_ids.extend(assets.iter().map(|asset| asset.id.clone()));
+    if unique_asset_ids.len() != assets.len() {
+        println!("Some assets have duplicate ids");
     }
 }
 
@@ -128,9 +137,37 @@ fn check_asset_sensors(
                 if unique_tags.len() != total_tags_count {
                     println!("Asset id={} has a mandatory sensor {} with duplicate tags", asset_id, man_sensor_id);
                 }
+
+                for unique_tag in &unique_tags {
+                    if !is_tag_name(unique_tag) {
+                        println!(
+                            "Asset id={} has invalid tag {}",
+                            asset_id, unique_tag
+                        );
+                    }
+                }
             }
         }
     }
+}
+
+fn has_duplicate_sensor_ids(
+    mandatory_sensors: &Vec<SensorInfo>,
+    optional_sensors: &Vec<SensorInfo>,
+) -> bool {
+    let mut unique_sensor_ids = HashSet::new();
+    unique_sensor_ids.extend(
+        mandatory_sensors
+            .iter()
+            .map(|sensor| sensor.sensor_id.clone()),
+    );
+    unique_sensor_ids.extend(
+        optional_sensors
+            .iter()
+            .map(|sensor| sensor.sensor_id.clone()),
+    );
+    unique_sensor_ids.len()
+        != (mandatory_sensors.len() + optional_sensors.len())
 }
 
 fn sensors_to_sensor_map(sensors: Vec<Sensor>) -> HashMap<String, Sensor> {
