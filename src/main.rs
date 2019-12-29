@@ -53,11 +53,13 @@ fn main() {
 
 fn parse_assets(assets_filepath: &str, sensors_filepath: &str) {
     let sensor_file_contents = fs::read_to_string(sensors_filepath).unwrap();
-    let raw_sensors: Vec<Sensor> = serde_json::from_str(&sensor_file_contents).unwrap();
+    let raw_sensors: Vec<Sensor> =
+        serde_json::from_str(&sensor_file_contents).unwrap();
     let sensors = sensors_to_sensor_map(clean_raw_sensors(raw_sensors));
 
     let asset_file_contents = fs::read_to_string(assets_filepath).unwrap();
-    let raw_assets: Vec<Asset> = serde_json::from_str(&asset_file_contents).unwrap();
+    let raw_assets: Vec<Asset> =
+        serde_json::from_str(&asset_file_contents).unwrap();
     let assets = clean_raw_assets(raw_assets);
 
     println!("{}", serde_json::to_string_pretty(&assets).unwrap());
@@ -93,18 +95,29 @@ fn parse_assets(assets_filepath: &str, sensors_filepath: &str) {
     }
 }
 
-fn check_asset_sensors(sensor_infos: &Vec<SensorInfo>, sensors: &HashMap<String, Sensor>, asset_id: &str) {
+fn check_asset_sensors(
+    sensor_infos: &Vec<SensorInfo>,
+    sensors: &HashMap<String, Sensor>,
+    asset_id: &str,
+) {
     for sensor_infos in sensor_infos {
         let man_sensor_id = &sensor_infos.sensor_id;
         let extra_sensor_tags = &sensor_infos.extra_skyspark_marker_tags;
         if man_sensor_id.is_empty() {
-            println!("Asset id={} has a mandatory sensor with an empty id", asset_id);
+            println!(
+                "Asset id={} has a mandatory sensor with an empty id",
+                asset_id
+            );
         }
         match sensors.get(man_sensor_id) {
-            None => println!("Asset id={} has an invalid mandatory sensor id {}", asset_id, man_sensor_id),
+            None => println!(
+                "Asset id={} has an invalid mandatory sensor id {}",
+                asset_id, man_sensor_id
+            ),
             Some(sensor) => {
                 let sensor_tags = &sensor.skyspark_marker_tags;
-                let total_tags_count = sensor_tags.len() + extra_sensor_tags.len();
+                let total_tags_count =
+                    sensor_tags.len() + extra_sensor_tags.len();
                 let mut unique_tags = HashSet::new();
                 for tag in sensor_tags {
                     unique_tags.insert(tag.clone());
@@ -239,11 +252,21 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
                 .collect();
             cleaned_tags.sort();
 
-            let mut cleaned_mandatory_sensors: Vec<SensorInfo> = raw_asset.mandatory_sensors.into_iter().map(|sensor_info| clean_raw_sensor_info(sensor_info)).collect();
-            cleaned_mandatory_sensors.sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
+            let mut cleaned_mandatory_sensors: Vec<SensorInfo> = raw_asset
+                .mandatory_sensors
+                .into_iter()
+                .map(|sensor_info| clean_raw_sensor_info(sensor_info))
+                .collect();
+            cleaned_mandatory_sensors
+                .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
 
-            let mut cleaned_optional_sensors: Vec<SensorInfo> = raw_asset.optional_sensors.into_iter().map(|sensor_info| clean_raw_sensor_info(sensor_info)).collect();
-            cleaned_optional_sensors.sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
+            let mut cleaned_optional_sensors: Vec<SensorInfo> = raw_asset
+                .optional_sensors
+                .into_iter()
+                .map(|sensor_info| clean_raw_sensor_info(sensor_info))
+                .collect();
+            cleaned_optional_sensors
+                .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
 
             Asset {
                 id: raw_asset.id.trim().to_owned(),
@@ -266,11 +289,16 @@ fn parse_args() -> Mode {
         let command = args.remove(1);
         let first_filepath = args.remove(1);
         match command.as_ref() {
-            "sensors" => Mode::ParseSensors { filepath: first_filepath },
+            "sensors" => Mode::ParseSensors {
+                filepath: first_filepath,
+            },
             "assets" => {
                 let second_filepath = args.remove(1);
-                Mode::ParseAssets { assets_filepath: first_filepath, sensors_filepath: second_filepath }
-            },
+                Mode::ParseAssets {
+                    assets_filepath: first_filepath,
+                    sensors_filepath: second_filepath,
+                }
+            }
             _ => print_help(),
         }
     }
@@ -285,8 +313,13 @@ fn print_help() -> ! {
 }
 
 enum Mode {
-    ParseSensors { filepath: String },
-    ParseAssets { assets_filepath: String, sensors_filepath: String },
+    ParseSensors {
+        filepath: String,
+    },
+    ParseAssets {
+        assets_filepath: String,
+        sensors_filepath: String,
+    },
 }
 
 /// Return true if the string is a valid SkySpark tag name.
