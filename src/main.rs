@@ -4,7 +4,7 @@ use std::fs;
 
 const UNITS_TXT: &str = include_str!("units.txt");
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Sensor {
     id: String,
@@ -15,14 +15,14 @@ struct Sensor {
     unit: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 enum SensorType {
     Bool,
     Numeric,
     String,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Asset {
     id: String,
@@ -30,9 +30,10 @@ struct Asset {
     skyspark_marker_tags: Vec<String>,
     mandatory_sensors: Vec<SensorInfo>,
     optional_sensors: Vec<SensorInfo>,
+    arms_asset_type_ids: Vec<u32>,
 }
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SensorInfo {
     sensor_id: String,
@@ -62,7 +63,7 @@ fn parse_assets(assets_filepath: &str, sensors_filepath: &str) {
         serde_json::from_str(&asset_file_contents).unwrap();
     let assets = clean_raw_assets(raw_assets);
 
-    println!("{}", serde_json::to_string_pretty(&assets).unwrap());
+    pretty_print(&serde_json::to_value(assets.clone()).unwrap());
 
     for asset in &assets {
         let id = &asset.id;
@@ -185,7 +186,7 @@ fn parse_sensors(filepath: &str) {
         serde_json::from_str(&file_contents).unwrap();
     let sensors = clean_raw_sensors(raw_sensors);
 
-    println!("{}", serde_json::to_string_pretty(&sensors).unwrap());
+    pretty_print(&serde_json::to_value(sensors.clone()).unwrap());
 
     for sensor in &sensors {
         let id = &sensor.id;
@@ -305,12 +306,17 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
             cleaned_optional_sensors
                 .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
 
+            let mut sorted_arms_asset_type_ids = raw_asset.arms_asset_type_ids;
+            sorted_arms_asset_type_ids.sort();
+            sorted_arms_asset_type_ids.dedup();
+
             Asset {
                 id: raw_asset.id.trim().to_owned(),
                 display_name: raw_asset.display_name.trim().to_owned(),
                 skyspark_marker_tags: cleaned_tags,
                 mandatory_sensors: cleaned_mandatory_sensors,
                 optional_sensors: cleaned_optional_sensors,
+                arms_asset_type_ids: sorted_arms_asset_type_ids,
             }
         })
         .collect();
@@ -391,4 +397,12 @@ fn units() -> HashSet<String> {
         }
     }
     units
+}
+
+fn pretty_print(json: &serde_json::Value) {
+    let buffer = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+    let mut serializer = serde_json::Serializer::with_formatter(buffer, formatter);
+    json.serialize(&mut serializer).unwrap();
+    println!("{}", String::from_utf8(serializer.into_inner()).unwrap());
 }
