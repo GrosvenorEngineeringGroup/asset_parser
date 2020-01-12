@@ -442,16 +442,6 @@ fn print_help() -> ! {
     std::process::exit(1);
 }
 
-enum Mode {
-    ParseSensors {
-        filepath: String,
-    },
-    ParseAssets {
-        assets_filepath: String,
-        sensors_filepath: String,
-    },
-}
-
 /// Return true if the string is a valid SkySpark tag name.
 pub fn is_tag_name<T: AsRef<str>>(s: T) -> bool {
     let s = s.as_ref();
