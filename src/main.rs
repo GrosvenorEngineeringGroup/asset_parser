@@ -51,6 +51,7 @@ impl HasId for Asset {
     }
 }
 
+/// Used to link a `Sensor` to an `Asset`.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SensorInfo {
@@ -87,6 +88,7 @@ fn main() {
     write_files(assets, sensors);
 }
 
+/// Write the assets and sensors to pretty-formatted JSON files.
 fn write_files(assets: Vec<Asset>, sensors: Vec<Sensor>) {
     let mut assets_output = File::create("new_assets.json")
         .expect("Could not create new assets file");
@@ -101,6 +103,7 @@ fn write_files(assets: Vec<Asset>, sensors: Vec<Sensor>) {
         .expect("Could not write to sensors file");
 }
 
+/// Returns true only if all the id values are unique in the given items.
 fn all_ids_unique<T: HasId>(items: &[T]) -> bool {
     let mut unique_ids = HashSet::new();
     unique_ids.extend(items.iter().map(|item| item.id()));
@@ -130,6 +133,7 @@ impl AssetError {
     }
 }
 
+/// Return all the errors present in the given assets.
 fn get_asset_errors(
     assets: &Vec<Asset>,
     sensors: &HashMap<String, Sensor>,
@@ -176,6 +180,7 @@ fn get_asset_errors(
     errs
 }
 
+/// Return all the errors present in an asset's sensors.
 fn check_asset_sensors(
     sensor_infos: &Vec<SensorInfo>,
     sensors: &HashMap<String, Sensor>,
@@ -227,6 +232,7 @@ fn check_asset_sensors(
     errs
 }
 
+/// Return true only if there are duplicate sensor ids in the given `Vec`s.
 fn has_duplicate_sensor_ids(
     mandatory_sensors: &Vec<SensorInfo>,
     optional_sensors: &Vec<SensorInfo>,
@@ -246,6 +252,7 @@ fn has_duplicate_sensor_ids(
         != (mandatory_sensors.len() + optional_sensors.len())
 }
 
+/// Return a map which maps the sensor's id to the `Sensor` struct itself.
 fn sensors_to_sensor_map(sensors: Vec<Sensor>) -> HashMap<String, Sensor> {
     let mut map = HashMap::new();
     for sensor in sensors {
@@ -278,6 +285,7 @@ impl SensorError {
     }
 }
 
+/// Return all the errors present in the given `Sensor`s.
 fn get_sensor_errors(sensors: &[Sensor]) -> Vec<SensorError> {
     let units = units();
     let mut errs = Vec::new();
@@ -330,6 +338,7 @@ fn get_sensor_errors(sensors: &[Sensor]) -> Vec<SensorError> {
     errs
 }
 
+/// Clean and sort the data in `raw_sensors`.
 fn clean_raw_sensors(raw_sensors: Vec<Sensor>) -> Vec<Sensor> {
     let mut sensors: Vec<Sensor> = raw_sensors
         .into_iter()
@@ -356,6 +365,7 @@ fn clean_raw_sensors(raw_sensors: Vec<Sensor>) -> Vec<Sensor> {
     sensors
 }
 
+/// Clean and sort the data in `sensor_info`.
 fn clean_raw_sensor_info(sensor_info: SensorInfo) -> SensorInfo {
     let mut cleaned_tags: Vec<String> = sensor_info
         .extra_skyspark_marker_tags
@@ -370,6 +380,7 @@ fn clean_raw_sensor_info(sensor_info: SensorInfo) -> SensorInfo {
     }
 }
 
+/// Clean and sort the data in `raw_assets`.
 fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
     let mut assets: Vec<Asset> = raw_assets
         .into_iter()
@@ -465,6 +476,7 @@ pub fn is_tag_name<T: AsRef<str>>(s: T) -> bool {
     }
 }
 
+/// Return a set of all units found by parsing `units.txt`.
 fn units() -> HashSet<String> {
     let mut units = HashSet::new();
     for line in UNITS_TXT.lines() {
@@ -476,6 +488,8 @@ fn units() -> HashSet<String> {
     units
 }
 
+/// Return a string containing valid JSON, which has been pretty-formatted
+/// with 4-space indentation.
 fn to_pretty_string(json: &serde_json::Value) -> String {
     let buffer = Vec::new();
     let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
