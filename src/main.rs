@@ -1,8 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 
 const UNITS_TXT: &str = include_str!("units.txt");
+
+trait HasId {
+    fn id(&self) -> String;
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,6 +19,12 @@ struct Sensor {
     #[serde(rename = "type")]
     sensor_type: SensorType,
     unit: Option<String>,
+}
+
+impl HasId for Sensor {
+    fn id(&self) -> String {
+        self.id.to_owned()
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -33,6 +45,12 @@ struct Asset {
     arms_asset_type_ids: Vec<u32>,
 }
 
+impl HasId for Asset {
+    fn id(&self) -> String {
+        self.id.to_owned()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SensorInfo {
@@ -41,89 +59,141 @@ struct SensorInfo {
 }
 
 fn main() {
-    let mode = parse_args();
-    match mode {
-        Mode::ParseSensors { filepath } => parse_sensors(&filepath),
-        Mode::ParseAssets {
-            assets_filepath,
-            sensors_filepath,
-        } => parse_assets(&assets_filepath, &sensors_filepath),
+    let args = parse_args();
+    let assets_file_contents = fs::read_to_string(args.assets_filepath)
+        .expect("Could not read assets file to string");
+    let sensors_file_contents = fs::read_to_string(args.sensors_filepath)
+        .expect("Could not read sensors file to string");
+    let assets = parse_assets(&assets_file_contents);
+    let sensors = parse_sensors(&sensors_file_contents);
+
+    let sensor_errs = get_sensor_errors(&sensors);
+    if !sensor_errs.is_empty() {
+        for err in sensor_errs {
+            println!("Sensor {}: {}", err.sensor_id, err.msg);
+        }
+        std::process::exit(1);
     }
-    ()
+
+    let asset_errs =
+        get_asset_errors(&assets, &sensors_to_sensor_map(sensors.clone()));
+    if !asset_errs.is_empty() {
+        for err in asset_errs {
+            println!("Asset {}: {}", err.asset_id, err.msg);
+        }
+        std::process::exit(1);
+    }
+
+    write_files(assets, sensors);
 }
 
-fn parse_assets(assets_filepath: &str, sensors_filepath: &str) {
-    let sensor_file_contents = fs::read_to_string(sensors_filepath).unwrap();
-    let raw_sensors: Vec<Sensor> =
-        serde_json::from_str(&sensor_file_contents).unwrap();
-    let sensors = sensors_to_sensor_map(clean_raw_sensors(raw_sensors));
+fn write_files(assets: Vec<Asset>, sensors: Vec<Sensor>) {
+    let mut assets_output = File::create("new_assets.json")
+        .expect("Could not create new assets file");
+    let assets = serde_json::to_value(assets.clone()).unwrap();
+    write!(assets_output, "{}", to_pretty_string(&assets))
+        .expect("Could not write to assets file");
 
-    let asset_file_contents = fs::read_to_string(assets_filepath).unwrap();
-    let raw_assets: Vec<Asset> =
-        serde_json::from_str(&asset_file_contents).unwrap();
-    let assets = clean_raw_assets(raw_assets);
+    let mut sensors_output = File::create("new_sensors.json")
+        .expect("Could not create new sensors file");
+    let sensors = serde_json::to_value(sensors.clone()).unwrap();
+    write!(sensors_output, "{}", to_pretty_string(&sensors))
+        .expect("Could not write to sensors file");
+}
 
-    pretty_print(&serde_json::to_value(assets.clone()).unwrap());
+fn all_ids_unique<T: HasId>(items: &[T]) -> bool {
+    let mut unique_ids = HashSet::new();
+    unique_ids.extend(items.iter().map(|item| item.id()));
+    unique_ids.len() == items.len()
+}
 
-    for asset in &assets {
+fn parse_assets(file_contents: &str) -> Vec<Asset> {
+    let raw_assets: Vec<Asset> = serde_json::from_str(&file_contents).unwrap();
+    clean_raw_assets(raw_assets)
+}
+
+struct AssetError {
+    asset_id: String,
+    msg: String,
+}
+
+impl AssetError {
+    fn new<S, T>(asset_id: S, msg: T) -> Self
+    where
+        S: AsRef<str>,
+        T: AsRef<str>,
+    {
+        AssetError {
+            asset_id: asset_id.as_ref().to_string(),
+            msg: msg.as_ref().to_string(),
+        }
+    }
+}
+
+fn get_asset_errors(
+    assets: &Vec<Asset>,
+    sensors: &HashMap<String, Sensor>,
+) -> Vec<AssetError> {
+    let mut errs = Vec::new();
+
+    for asset in assets.iter() {
         let id = &asset.id;
         let asset_tags = &asset.skyspark_marker_tags;
         let mandatory_sensors = &asset.mandatory_sensors;
         let optional_sensors = &asset.optional_sensors;
 
         if id.is_empty() {
-            println!("An asset has an empty id");
+            errs.push(AssetError::new("?", "An asset has an empty id"));
         }
         if asset_tags.is_empty() {
-            println!("Asset id={} has no SkySpark marker tags", id);
+            errs.push(AssetError::new(id, "No SkySpark marker tags"));
         }
         for asset_tag in asset_tags {
             if !is_tag_name(asset_tag) {
-                println!(
-                    "Asset id={} has an invalid SkySpark marker tag '{}'",
-                    id, asset_tag
-                );
+                errs.push(AssetError::new(
+                    id,
+                    format!("Invalid SkySpark marker tag '{}'", asset_tag),
+                ));
             }
         }
         if asset.display_name.is_empty() {
-            println!("Asset id={} has an empty display name", id);
+            errs.push(AssetError::new(id, "Empty display name"));
         }
         if mandatory_sensors.is_empty() {
-            println!("Asset id={} has no mandatory sensors", id);
+            errs.push(AssetError::new(id, "No mandatory sensors"));
         }
-        check_asset_sensors(mandatory_sensors, &sensors, id);
-        check_asset_sensors(optional_sensors, &sensors, id);
+        errs.extend(check_asset_sensors(mandatory_sensors, sensors, id));
+        errs.extend(check_asset_sensors(optional_sensors, sensors, id));
         if has_duplicate_sensor_ids(mandatory_sensors, optional_sensors) {
-            println!("Asset id={} has duplicate sensor ids", id);
+            errs.push(AssetError::new(id, "Duplicate sensor ids"));
         }
     }
 
-    let mut unique_asset_ids = HashSet::new();
-    unique_asset_ids.extend(assets.iter().map(|asset| asset.id.clone()));
-    if unique_asset_ids.len() != assets.len() {
-        println!("Some assets have duplicate ids");
+    if !all_ids_unique(assets) {
+        errs.push(AssetError::new("-", "Some assets have duplicate ids"));
     }
+
+    errs
 }
 
 fn check_asset_sensors(
     sensor_infos: &Vec<SensorInfo>,
     sensors: &HashMap<String, Sensor>,
     asset_id: &str,
-) {
+) -> Vec<AssetError> {
+    let mut errs = Vec::new();
+
     for sensor_infos in sensor_infos {
-        let man_sensor_id = &sensor_infos.sensor_id;
+        let sensor_id = &sensor_infos.sensor_id;
         let extra_sensor_tags = &sensor_infos.extra_skyspark_marker_tags;
-        if man_sensor_id.is_empty() {
-            println!(
-                "Asset id={} has a mandatory sensor with an empty id",
-                asset_id
-            );
+        if sensor_id.is_empty() {
+            errs.push(AssetError::new(asset_id, "Sensor has an empty id"));
         }
-        match sensors.get(man_sensor_id) {
-            None => println!(
-                "Asset id={} has an invalid mandatory sensor id {}",
-                asset_id, man_sensor_id
-            ),
+        match sensors.get(sensor_id) {
+            None => errs.push(AssetError::new(
+                asset_id,
+                format!("No matching sensor with id '{}'", sensor_id),
+            )),
             Some(sensor) => {
                 let sensor_tags = &sensor.skyspark_marker_tags;
                 let total_tags_count =
@@ -136,20 +206,25 @@ fn check_asset_sensors(
                     unique_tags.insert(tag.clone());
                 }
                 if unique_tags.len() != total_tags_count {
-                    println!("Asset id={} has a mandatory sensor {} with duplicate tags", asset_id, man_sensor_id);
+                    errs.push(AssetError::new(
+                        asset_id,
+                        format!("Sensor '{}' has duplicate tags", sensor_id),
+                    ));
                 }
 
                 for unique_tag in &unique_tags {
                     if !is_tag_name(unique_tag) {
-                        println!(
-                            "Asset id={} has invalid tag {}",
-                            asset_id, unique_tag
-                        );
+                        errs.push(AssetError::new(
+                            asset_id,
+                            format!("Invalid tag {}", unique_tag),
+                        ));
                     }
                 }
             }
         }
     }
+
+    errs
 }
 
 fn has_duplicate_sensor_ids(
@@ -179,64 +254,80 @@ fn sensors_to_sensor_map(sensors: Vec<Sensor>) -> HashMap<String, Sensor> {
     map
 }
 
-fn parse_sensors(filepath: &str) {
-    let units = units();
-    let file_contents = fs::read_to_string(filepath).unwrap();
+fn parse_sensors(file_contents: &str) -> Vec<Sensor> {
     let raw_sensors: Vec<Sensor> =
         serde_json::from_str(&file_contents).unwrap();
-    let sensors = clean_raw_sensors(raw_sensors);
+    clean_raw_sensors(raw_sensors)
+}
 
-    pretty_print(&serde_json::to_value(sensors.clone()).unwrap());
+struct SensorError {
+    sensor_id: String,
+    msg: String,
+}
 
-    for sensor in &sensors {
+impl SensorError {
+    fn new<S, T>(sensor_id: S, msg: T) -> Self
+    where
+        S: AsRef<str>,
+        T: AsRef<str>,
+    {
+        SensorError {
+            sensor_id: sensor_id.as_ref().to_string(),
+            msg: msg.as_ref().to_string(),
+        }
+    }
+}
+
+fn get_sensor_errors(sensors: &[Sensor]) -> Vec<SensorError> {
+    let units = units();
+    let mut errs = Vec::new();
+
+    for sensor in sensors.iter() {
         let id = &sensor.id;
         let tags = &sensor.skyspark_marker_tags;
         let unit = &sensor.unit;
 
         if id.is_empty() {
-            println!("A sensor has an empty id");
+            errs.push(SensorError::new("?", "A sensor has an empty id"));
         }
         if sensor.display_name.is_empty() {
-            println!("Sensor id={} has an empty display name", id);
+            errs.push(SensorError::new(id, "Empty display name"));
         }
         if tags.is_empty() {
-            println!("Sensor id={} has no SkySpark marker tags", id);
+            errs.push(SensorError::new(id, "No SkySpark marker tags"));
         }
         for tag in tags {
             if !is_tag_name(tag) {
-                println!(
-                    "Sensor id={} has an invalid SkySpark marker tag '{}'",
-                    id, tag
-                );
+                errs.push(SensorError::new(
+                    id,
+                    format!("Invalid SkySpark marker tag '{}'", tag),
+                ));
             }
         }
         if sensor.sensor_type == SensorType::Numeric {
             match unit {
                 Some(unit) => {
                     if !units.contains(unit) {
-                        println!("Sensor id={} has an invalid unit", id);
+                        errs.push(SensorError::new(id, "Invalid unit"));
                     }
                 }
                 None => (), // It's ok to have no unit, just highly uncommon.
             }
         } else {
             if unit.is_some() {
-                println!("Sensor id={} has a unit but is not numeric", id);
+                errs.push(SensorError::new(
+                    id,
+                    "Has a unit but is not numeric",
+                ));
             }
         }
     }
 
-    if sensors.len() != unique_ids_count(&sensors) {
-        println!("Some sensor ids are not unique")
+    if !all_ids_unique(&sensors) {
+        errs.push(SensorError::new("-", "Some sensor ids are not unique"));
     }
-}
 
-fn unique_ids_count(sensors: &[Sensor]) -> usize {
-    let mut ids: Vec<String> =
-        sensors.iter().map(|sensor| sensor.id.to_owned()).collect();
-    ids.sort();
-    ids.dedup();
-    ids.len()
+    errs
 }
 
 fn clean_raw_sensors(raw_sensors: Vec<Sensor>) -> Vec<Sensor> {
@@ -324,45 +415,31 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
     assets
 }
 
-fn parse_args() -> Mode {
+struct Args {
+    assets_filepath: String,
+    sensors_filepath: String,
+}
+
+fn parse_args() -> Args {
     let mut args: Vec<String> = std::env::args().collect();
-    if args.len() != 3 && args.len() != 4 {
+    if args.len() != 3 {
         print_help();
     } else {
-        let command = args.remove(1);
-        let first_filepath = args.remove(1);
-        match command.as_ref() {
-            "sensors" => Mode::ParseSensors {
-                filepath: first_filepath,
-            },
-            "assets" => {
-                let second_filepath = args.remove(1);
-                Mode::ParseAssets {
-                    assets_filepath: first_filepath,
-                    sensors_filepath: second_filepath,
-                }
-            }
-            _ => print_help(),
+        let assets_filepath = args.remove(1);
+        let sensors_filepath = args.remove(1);
+
+        Args {
+            assets_filepath,
+            sensors_filepath,
         }
     }
 }
 
 fn print_help() -> ! {
     println!("Could not parse arguments.");
-    println!("Example usages:");
-    println!("    asset_parser sensors '/path/to/sensors.json'");
-    println!("    asset_parser assets '/path/to/assets.json'");
-    std::process::exit(0);
-}
-
-enum Mode {
-    ParseSensors {
-        filepath: String,
-    },
-    ParseAssets {
-        assets_filepath: String,
-        sensors_filepath: String,
-    },
+    println!("Example usage:");
+    println!("    asset_parser '/path/to/assets.json' '/path/to/sensors.json'");
+    std::process::exit(1);
 }
 
 /// Return true if the string is a valid SkySpark tag name.
@@ -399,10 +476,11 @@ fn units() -> HashSet<String> {
     units
 }
 
-fn pretty_print(json: &serde_json::Value) {
+fn to_pretty_string(json: &serde_json::Value) -> String {
     let buffer = Vec::new();
     let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
-    let mut serializer = serde_json::Serializer::with_formatter(buffer, formatter);
+    let mut serializer =
+        serde_json::Serializer::with_formatter(buffer, formatter);
     json.serialize(&mut serializer).unwrap();
-    println!("{}", String::from_utf8(serializer.into_inner()).unwrap());
+    String::from_utf8(serializer.into_inner()).unwrap()
 }
