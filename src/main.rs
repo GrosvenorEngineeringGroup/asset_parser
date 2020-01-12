@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 
 const UNITS_TXT: &str = include_str!("units.txt");
 
@@ -59,10 +60,10 @@ struct SensorInfo {
 
 fn main() {
     let args = parse_args();
-    let assets_file_contents =
-        fs::read_to_string(args.assets_filepath).expect("Could not read assets file to string");
-    let sensors_file_contents =
-        fs::read_to_string(args.sensors_filepath).expect("Could not read sensors file to string");
+    let assets_file_contents = fs::read_to_string(args.assets_filepath)
+        .expect("Could not read assets file to string");
+    let sensors_file_contents = fs::read_to_string(args.sensors_filepath)
+        .expect("Could not read sensors file to string");
     let assets = parse_assets(&assets_file_contents);
     let sensors = parse_sensors(&sensors_file_contents);
 
@@ -74,7 +75,8 @@ fn main() {
         std::process::exit(1);
     }
 
-    let asset_errs = get_asset_errors(&assets, &sensors_to_sensor_map(sensors));
+    let asset_errs =
+        get_asset_errors(&assets, &sensors_to_sensor_map(sensors.clone()));
     if !asset_errs.is_empty() {
         for err in asset_errs {
             println!("Asset {}: {}", err.asset_id, err.msg);
@@ -86,13 +88,17 @@ fn main() {
 }
 
 fn write_files(assets: Vec<Asset>, sensors: Vec<Sensor>) {
-    let mut assets_output = File::create("new_assets.json").expect("Could not create new assets file");
+    let mut assets_output = File::create("new_assets.json")
+        .expect("Could not create new assets file");
     let assets = serde_json::to_value(assets.clone()).unwrap();
-    write!(assets_output, "{}", to_pretty_string(&assets)).expect("Could not write to assets file");
+    write!(assets_output, "{}", to_pretty_string(&assets))
+        .expect("Could not write to assets file");
 
-    let mut sensors_output = File::create("new_sensors.json").expect("Could not create new sensors file");
+    let mut sensors_output = File::create("new_sensors.json")
+        .expect("Could not create new sensors file");
     let sensors = serde_json::to_value(sensors.clone()).unwrap();
-    write!(assets_output, "{}", to_pretty_string(&sensors)).expect("Could not write to sensors file");
+    write!(sensors_output, "{}", to_pretty_string(&sensors))
+        .expect("Could not write to sensors file");
 }
 
 fn all_ids_unique<T: HasId>(items: &[T]) -> bool {
