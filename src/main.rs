@@ -4,6 +4,7 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 
+const ARMS_ASSET_TYPE_IDS_TXT: &str = include_str!("arms-asset-type-ids.txt");
 const UNITS_TXT: &str = include_str!("units.txt");
 
 trait HasId {
@@ -76,8 +77,14 @@ fn main() {
         std::process::exit(1);
     }
 
-    let asset_errs =
-        get_asset_errors(&assets, &sensors_to_sensor_map(sensors.clone()));
+    let asset_type_ids =
+        arms_asset_type_ids().expect("All AssetTypeIDs should parse as u32");
+
+    let asset_errs = get_asset_errors(
+        &assets,
+        &sensors_to_sensor_map(sensors.clone()),
+        &asset_type_ids,
+    );
     if !asset_errs.is_empty() {
         for err in asset_errs {
             println!("Asset {}: {}", err.asset_id, err.msg);
@@ -137,6 +144,7 @@ impl AssetError {
 fn get_asset_errors(
     assets: &Vec<Asset>,
     sensors: &HashMap<String, Sensor>,
+    arms_asset_type_ids: &HashSet<u32>,
 ) -> Vec<AssetError> {
     let mut errs = Vec::new();
 
@@ -170,6 +178,15 @@ fn get_asset_errors(
         errs.extend(check_asset_sensors(optional_sensors, sensors, id));
         if has_duplicate_sensor_ids(mandatory_sensors, optional_sensors) {
             errs.push(AssetError::new(id, "Duplicate sensor ids"));
+        }
+
+        for asset_type_id in &asset.arms_asset_type_ids {
+            if arms_asset_type_ids.contains(asset_type_id) {
+                errs.push(AssetError::new(
+                    id,
+                    format!("Invalid AssetTypeID {}", asset_type_id),
+                ))
+            }
         }
     }
 
@@ -497,4 +514,13 @@ fn to_pretty_string(json: &serde_json::Value) -> String {
         serde_json::Serializer::with_formatter(buffer, formatter);
     json.serialize(&mut serializer).unwrap();
     String::from_utf8(serializer.into_inner()).unwrap()
+}
+
+fn arms_asset_type_ids() -> Result<HashSet<u32>, Box<dyn std::error::Error>> {
+    let mut set = HashSet::new();
+    let ids: Result<Vec<u32>, _> =
+        ARMS_ASSET_TYPE_IDS_TXT.lines().map(|s| s.parse()).collect();
+    let ids = ids?;
+    set.extend(ids);
+    Ok(set)
 }
