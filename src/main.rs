@@ -181,7 +181,7 @@ fn get_asset_errors(
         }
 
         for asset_type_id in &asset.arms_asset_type_ids {
-            if arms_asset_type_ids.contains(asset_type_id) {
+            if !arms_asset_type_ids.contains(asset_type_id) {
                 errs.push(AssetError::new(
                     id,
                     format!("Invalid AssetTypeID {}", asset_type_id),
