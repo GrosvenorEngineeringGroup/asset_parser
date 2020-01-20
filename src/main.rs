@@ -99,13 +99,13 @@ fn main() {
 fn write_files(assets: Vec<Asset>, sensors: Vec<Sensor>) {
     let mut assets_output = File::create("new_assets.json")
         .expect("Could not create new assets file");
-    let assets = serde_json::to_value(assets.clone()).unwrap();
+    let assets = serde_json::to_value(assets).unwrap();
     write!(assets_output, "{}", to_pretty_string(&assets))
         .expect("Could not write to assets file");
 
     let mut sensors_output = File::create("new_sensors.json")
         .expect("Could not create new sensors file");
-    let sensors = serde_json::to_value(sensors.clone()).unwrap();
+    let sensors = serde_json::to_value(sensors).unwrap();
     write!(sensors_output, "{}", to_pretty_string(&sensors))
         .expect("Could not write to sensors file");
 }
@@ -142,7 +142,7 @@ impl AssetError {
 
 /// Return all the errors present in the given assets.
 fn get_asset_errors(
-    assets: &Vec<Asset>,
+    assets: &[Asset],
     sensors: &HashMap<String, Sensor>,
     arms_asset_type_ids: &HashSet<u32>,
 ) -> Vec<AssetError> {
@@ -199,7 +199,7 @@ fn get_asset_errors(
 
 /// Return all the errors present in an asset's sensors.
 fn check_asset_sensors(
-    sensor_infos: &Vec<SensorInfo>,
+    sensor_infos: &[SensorInfo],
     sensors: &HashMap<String, Sensor>,
     asset_id: &str,
 ) -> Vec<AssetError> {
@@ -251,8 +251,8 @@ fn check_asset_sensors(
 
 /// Return true only if there are duplicate sensor ids in the given `Vec`s.
 fn has_duplicate_sensor_ids(
-    mandatory_sensors: &Vec<SensorInfo>,
-    optional_sensors: &Vec<SensorInfo>,
+    mandatory_sensors: &[SensorInfo],
+    optional_sensors: &[SensorInfo],
 ) -> bool {
     let mut unique_sensor_ids = HashSet::new();
     unique_sensor_ids.extend(
@@ -338,13 +338,8 @@ fn get_sensor_errors(sensors: &[Sensor]) -> Vec<SensorError> {
                 }
                 None => (), // It's ok to have no unit, just highly uncommon.
             }
-        } else {
-            if unit.is_some() {
-                errs.push(SensorError::new(
-                    id,
-                    "Has a unit but is not numeric",
-                ));
-            }
+        } else if unit.is_some() {
+            errs.push(SensorError::new(id, "Has a unit but is not numeric"));
         }
     }
 
@@ -412,7 +407,7 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
             let mut cleaned_mandatory_sensors: Vec<SensorInfo> = raw_asset
                 .mandatory_sensors
                 .into_iter()
-                .map(|sensor_info| clean_raw_sensor_info(sensor_info))
+                .map(clean_raw_sensor_info)
                 .collect();
             cleaned_mandatory_sensors
                 .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
@@ -420,7 +415,7 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
             let mut cleaned_optional_sensors: Vec<SensorInfo> = raw_asset
                 .optional_sensors
                 .into_iter()
-                .map(|sensor_info| clean_raw_sensor_info(sensor_info))
+                .map(clean_raw_sensor_info)
                 .collect();
             cleaned_optional_sensors
                 .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
@@ -499,7 +494,7 @@ fn units() -> HashSet<String> {
     for line in UNITS_TXT.lines() {
         let line = line.trim();
         if !line.is_empty() && !line.starts_with("--") {
-            units.extend(line.split(",").map(|s| s.to_owned()));
+            units.extend(line.split(',').map(|s| s.to_owned()));
         }
     }
     units
