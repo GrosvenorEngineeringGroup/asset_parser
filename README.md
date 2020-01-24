@@ -10,6 +10,9 @@ the error messages to the terminal.
 1. `cargo install --force --path .`
 1. Run:
     1. `asset_parser 'path/to/assets.json' 'path/to/sensors.json'`
+    
+## arms-asset-type-ids.txt
+This file enumerates the Asset Type IDs in ARMS. This file should be updated manually.
 
 # Units.txt License
 The file `units.txt` was copied from Project Haystack, and that file is licensed under
