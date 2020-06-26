@@ -1,6 +1,6 @@
 [package]
 name = "asset_parser"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Anthony Mackay <amk@gegroup.com.au>"]
 edition = "2018"
 
