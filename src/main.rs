@@ -39,6 +39,7 @@ enum SensorType {
 #[serde(rename_all = "camelCase")]
 struct Asset {
     id: String,
+    is_plant: Option<bool>,
     display_name: String,
     skyspark_marker_tags: Vec<String>,
     mandatory_sensors: Vec<SensorInfo>,
@@ -426,6 +427,7 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
 
             Asset {
                 id: raw_asset.id.trim().to_owned(),
+                is_plant: raw_asset.is_plant,
                 display_name: raw_asset.display_name.trim().to_owned(),
                 skyspark_marker_tags: cleaned_tags,
                 mandatory_sensors: cleaned_mandatory_sensors,
