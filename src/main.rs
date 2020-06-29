@@ -39,6 +39,7 @@ enum SensorType {
 #[serde(rename_all = "camelCase")]
 struct Asset {
     id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     is_plant: Option<bool>,
     display_name: String,
     skyspark_marker_tags: Vec<String>,
