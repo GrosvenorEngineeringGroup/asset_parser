@@ -155,6 +155,8 @@ fn get_asset_errors(
         let asset_tags = &asset.skyspark_marker_tags;
         let mandatory_sensors = &asset.mandatory_sensors;
         let optional_sensors = &asset.optional_sensors;
+        let is_dev_equip =
+            asset.skyspark_marker_tags.contains(&"developer".to_owned());
 
         if id.is_empty() {
             errs.push(AssetError::new("?", "An asset has an empty id"));
@@ -173,7 +175,7 @@ fn get_asset_errors(
         if asset.display_name.is_empty() {
             errs.push(AssetError::new(id, "Empty display name"));
         }
-        if mandatory_sensors.is_empty() {
+        if mandatory_sensors.is_empty() && !is_dev_equip {
             errs.push(AssetError::new(id, "No mandatory sensors"));
         }
         errs.extend(check_asset_sensors(mandatory_sensors, sensors, id));
@@ -423,7 +425,7 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
                 .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
 
             let mut sorted_arms_asset_type_ids = raw_asset.arms_asset_type_ids;
-            sorted_arms_asset_type_ids.sort();
+            sorted_arms_asset_type_ids.sort_unstable();
             sorted_arms_asset_type_ids.dedup();
 
             Asset {
