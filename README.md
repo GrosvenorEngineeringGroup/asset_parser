@@ -24,6 +24,7 @@ To compile this project for a Linux machine (e.g. a machine which runs GitHub Ac
 1. Copy that binary file, and rename it to `asset_parser_x86_64-unknown-linux-gnu`.
 1. Create a new release for this repository on GitHub's website.
 1. Upload that binary file to the GitHub release. The gegCoreLibExt repository uses this binary in its CI scripts.
+1. Edit the CI scripts in the gegCoreLibExt repository by updating the version number of asset_parser.
 1. Change the rustup profile back to default with `rustup set profile default`
 
 ## src/arms-asset-type-ids.txt
