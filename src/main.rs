@@ -45,7 +45,7 @@ struct Asset {
     skyspark_marker_tags: Vec<String>,
     mandatory_sensors: Vec<SensorInfo>,
     optional_sensors: Vec<SensorInfo>,
-    arms_asset_type_ids: Vec<u32>,
+    arms_asset_type_id: Option<u32>,
 }
 
 impl HasId for Asset {
@@ -184,7 +184,7 @@ fn get_asset_errors(
             errs.push(AssetError::new(id, "Duplicate sensor ids"));
         }
 
-        for asset_type_id in &asset.arms_asset_type_ids {
+        if let Some(asset_type_id) = &asset.arms_asset_type_id {
             if !arms_asset_type_ids.contains(asset_type_id) {
                 errs.push(AssetError::new(
                     id,
@@ -424,10 +424,6 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
             cleaned_optional_sensors
                 .sort_by(|a, b| a.sensor_id.cmp(&b.sensor_id));
 
-            let mut sorted_arms_asset_type_ids = raw_asset.arms_asset_type_ids;
-            sorted_arms_asset_type_ids.sort_unstable();
-            sorted_arms_asset_type_ids.dedup();
-
             Asset {
                 id: raw_asset.id.trim().to_owned(),
                 is_plant: raw_asset.is_plant,
@@ -435,7 +431,7 @@ fn clean_raw_assets(raw_assets: Vec<Asset>) -> Vec<Asset> {
                 skyspark_marker_tags: cleaned_tags,
                 mandatory_sensors: cleaned_mandatory_sensors,
                 optional_sensors: cleaned_optional_sensors,
-                arms_asset_type_ids: sorted_arms_asset_type_ids,
+                arms_asset_type_id: raw_asset.arms_asset_type_id,
             }
         })
         .collect();
