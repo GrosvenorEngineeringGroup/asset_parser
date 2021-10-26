@@ -272,8 +272,8 @@ tons_refrigeration_hour,tonrefh
 megajoule,MJ
 gigajoule,GJ
 newton_meter,Nm
-cubic_meters_natural_gas,m³_gas
-cubic_feet_natural_gas,ft³_gas
+cubic_meters_natural_gas,standard_cubic_meter,scm,m³_gas
+cubic_feet_natural_gas,standard_cubic_foot,scf,ft³_gas
 hundred_cubic_feet_natural_gas
 thousand_cubic_feet_natural_gas
 million_cubic_feet_natural_gas
