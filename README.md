@@ -13,7 +13,6 @@ a consistent format for the assets library.
 1. Install [rustup](https://rustup.rs), which will install the Rust programming language and the cargo command line tool.
 1. Navigate to the asset_parser directory: `cd path/to/asset_parser`
 1. Install asset_parser: `cargo install --force --path .`
-https://github.com/GrosvenorEngineeringGroup/gegCoreLibExt/tree/master/asset-library
 1. Run the asset_parser command line tool with: `asset_parser 'path/to/assets.json' 'path/to/sensors.json'`
     * These two files can be found at https://github.com/GrosvenorEngineeringGroup/gegCoreLibExt/tree/master/asset-library
 
